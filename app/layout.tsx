@@ -46,6 +46,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             <main>
             {children}
             </main>
+
+            <Toaster richColors />
           </ThemeProvider>
       </body>
     </html>
