@@ -5,6 +5,7 @@ import { DM_Sans, Lora } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import Header from "@/components/Header";
+import { Toaster } from "@/components/ui/sonner";
 
 
 const lora = Lora({

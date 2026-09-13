@@ -1,7 +1,8 @@
 "use client";
 
 import { useAuth, SignInButton } from "@clerk/nextjs";
-import { CheckoutButton } from "@clerk/nextjs/experimental";
+import { CheckoutButton, useSubscription } from "@clerk/nextjs/experimental";
+import { useRouter } from "next/navigation";
 import { ArrowRight, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -25,7 +26,10 @@ export function PricingModal({
   children,
   reason = "upgrade",
 }: PricingModalProps) {
-  const { isSignedIn, has } = useAuth();
+  const { isSignedIn } = useAuth();
+  const { data: subscription, revalidate: revalidateSubscription } =
+    useSubscription({ enabled: Boolean(isSignedIn) });
+  const router = useRouter();
 
   const title =
     reason === "credits" ? "You're out of credits" : "Upgrade your plan";
@@ -40,10 +44,19 @@ export function PricingModal({
     pro: 2,
   };
 
+  const activePlanIdentifiers = new Set(
+    subscription?.subscriptionItems
+      .filter((item) => item.status === "active")
+      .flatMap((item) => [item.plan.id, item.plan.slug, `user:${item.plan.slug}`]) ?? []
+  );
   const activePlanKey = isSignedIn
-    ? has?.({ plan: "pro" })
+    ? activePlanIdentifiers.has("cplan_3IxKiTUsfPtt2fY8qMIlnC8vWBC") ||
+      activePlanIdentifiers.has("pro") ||
+      activePlanIdentifiers.has("user:pro")
       ? "pro"
-      : has?.({ plan: "starter" })
+      : activePlanIdentifiers.has("cplan_3IxKH7NBtYeg5DIArjosoTUlDe2") ||
+        activePlanIdentifiers.has("starter") ||
+        activePlanIdentifiers.has("user:starter")
       ? "starter"
       : "free"
     : null;
@@ -179,6 +192,10 @@ export function PricingModal({
                     <CheckoutButton
                       planId={plan.planId}
                       planPeriod="month"
+                      onSubscriptionComplete={async () => {
+                        await revalidateSubscription();
+                        router.refresh();
+                      }}
                       checkoutProps={{
                         appearance: {
                           elements: {

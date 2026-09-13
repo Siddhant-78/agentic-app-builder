@@ -1,12 +1,38 @@
-import { auth, currentUser } from "@clerk/nextjs/server";
+import { auth, clerkClient, currentUser } from "@clerk/nextjs/server";
 import { db } from "./prisma";
-import { PLANS } from "./constants";
+import { CLERK_PLAN_IDENTIFIERS, PLANS } from "./constants";
 import type { Plan } from "@/types/plans";
 
-const getCurrentPlan = async (): Promise<Plan> => {
+const getCurrentPlan = async (userId: string): Promise<Plan> => {
+  try {
+    const client = await clerkClient();
+    const subscription = await client.billing.getUserBillingSubscription(userId);
+    const activeItem = subscription.subscriptionItems.find(
+      (item) => item.status === "active" && item.plan
+    );
+    const identifiers = [
+      activeItem?.plan?.id,
+      activeItem?.plan?.slug,
+      activeItem?.plan?.slug ? `user:${activeItem.plan.slug}` : undefined,
+    ].filter((identifier): identifier is string => Boolean(identifier));
+
+    if (CLERK_PLAN_IDENTIFIERS.pro.some((plan) => identifiers.includes(plan))) {
+      return "pro";
+    }
+    if (
+      CLERK_PLAN_IDENTIFIERS.starter.some((plan) => identifiers.includes(plan))
+    ) {
+      return "starter";
+    }
+  } catch (error) {
+    console.error("Could not read Clerk billing subscription:", error);
+  }
+
   const { has } = await auth();
-  if (has({ plan: "pro" })) return "pro";
-  if (has({ plan: "starter" })) return "starter";
+  if (CLERK_PLAN_IDENTIFIERS.pro.some((plan) => has({ plan }))) return "pro";
+  if (CLERK_PLAN_IDENTIFIERS.starter.some((plan) => has({ plan }))) {
+    return "starter";
+  }
   return "free";
 };
 
@@ -15,7 +41,7 @@ export const checkUser = async () => {
   if (!user) return null;
 
   try {
-    const currentPlan = await getCurrentPlan();
+    const currentPlan = await getCurrentPlan(user.id);
 
     const existing = await db.user.findUnique({
       where: { clerkId: user.id },

@@ -16,6 +16,11 @@ export const PLANS = {
   },
 } as const;
 
+export const CLERK_PLAN_IDENTIFIERS = {
+  starter: ["starter", "user:starter", "cplan_3IxKH7NBtYeg5DIArjosoTUlDe2"],
+  pro: ["pro", "user:pro", "cplan_3IxKiTUsfPtt2fY8qMIlnC8vWBC"],
+} as const;
+
 export const CREDIT_COST_PER_GENERATION = 1;
 
 export const MIN_CREDITS_TO_GENERATE = 1;
@@ -56,11 +61,9 @@ export const PRICING_PLANS = [
     active: false,
     features: [
       "150 generations / month",
-      "Priority AI (faster response)",
       "Live preview",
       "Export to zip",
       "Image uploads",
-      "Access to Forge Pro Agent",
     ],
   },
 ] as const;

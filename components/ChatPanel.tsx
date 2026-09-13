@@ -8,7 +8,6 @@ import {
   Loader2,
   X,
   Sparkles,
-  Wand2,
   Square,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -16,25 +15,18 @@ import ReactMarkdown from "react-markdown";
 import { Button } from "@/components/ui/button";
 import { PricingModal } from "@/components/PricingModal";
 import type { Message, StatusStep } from "@/types/workspace";
-import { createClient } from "@supabase/supabase-js";
-import { BlueTitle } from "./reusables";
+import { toast } from "sonner";
+import { BlueTitle } from "./resuables";
 import Image from "next/image";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 interface ChatPanelProps {
   messages: Message[];
   isGenerating: boolean;
-  isImproving: boolean;
   statusLog: StatusStep[];
   credits: number;
   initialPrompt: string | null;
   onGenerate: (prompt: string, imageUrl?: string) => Promise<void>;
   onStop: () => void;
-  userId: string;
   workspaceId: string | null;
   appTitle: string | null;
 }
@@ -42,13 +34,11 @@ interface ChatPanelProps {
 export function ChatPanel({
   messages,
   isGenerating,
-  isImproving,
   statusLog,
   credits,
   initialPrompt,
   onGenerate,
   onStop,
-  userId,
   workspaceId,
   appTitle,
 }: ChatPanelProps) {
@@ -66,7 +56,6 @@ export function ChatPanel({
 
   // The last message is the live-streaming assistant placeholder during improve
   const lastMsg = messages[messages.length - 1];
-  const isStreamingAssistant = isImproving && lastMsg?.role === "assistant";
 
   // Auto-resize textarea
   useEffect(() => {
@@ -81,7 +70,7 @@ export function ChatPanel({
     const el = scrollContainerRef.current;
     if (!el) return;
     el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-  }, [messages, isGenerating, isImproving]);
+  }, [messages, isGenerating]);
 
   useEffect(() => {
     if (!initialPrompt || hasAutoSubmittedRef.current || messages.length > 0)
@@ -93,7 +82,7 @@ export function ChatPanel({
 
   const handleSubmit = async () => {
     const trimmed = input.trim();
-    if (!trimmed || isGenerating || isImproving || noCredits) return;
+    if (!trimmed || isGenerating || noCredits) return;
     setInput("");
     setPendingImageUrl(null);
     await onGenerate(trimmed, pendingImageUrl ?? undefined);
@@ -111,18 +100,24 @@ export function ChatPanel({
     if (!file || !file.type.startsWith("image/")) return;
     setIsUploading(true);
     try {
-      const ext = file.name.split(".").pop();
-      const path = `${userId}/${workspaceId ?? "new"}/${Date.now()}.${ext}`;
-      const { error } = await supabase.storage
-        .from("workspace-images")
-        .upload(path, file, { upsert: true });
-      if (error) throw error;
-      const { data } = supabase.storage
-        .from("workspace-images")
-        .getPublicUrl(path);
-      setPendingImageUrl(data.publicUrl);
-    } catch {
-      // silent
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("workspaceId", workspaceId ?? "new");
+      const response = await fetch("/api/upload-image", {
+        method: "POST",
+        body: formData,
+      });
+      const result = (await response.json()) as { url?: string; message?: string };
+      if (!response.ok || !result.url) {
+        throw new Error(result.message ?? "Image upload failed.");
+      }
+      setPendingImageUrl(result.url);
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Image upload failed. Check the Supabase storage bucket."
+      );
     } finally {
       setIsUploading(false);
       if (fileRef.current) fileRef.current.value = "";
@@ -130,7 +125,7 @@ export function ChatPanel({
   };
 
   const canSubmit =
-    input.trim().length > 0 && !isGenerating && !isImproving && !noCredits;
+    input.trim().length > 0 && !isGenerating && !noCredits;
 
   return (
     <div className="flex w-[320px] shrink-0 flex-col bg-[#0d0d0d]">
@@ -169,8 +164,6 @@ export function ChatPanel({
         <div className="space-y-4">
           {messages.map((msg, i) => {
             const isLast = i === messages.length - 1;
-            // This is the live-streaming assistant bubble during improve
-            const isLiveStream = isLast && isStreamingAssistant;
 
             return (
               <div key={i}>
@@ -214,35 +207,11 @@ export function ChatPanel({
                       className="mt-0.5 h-6 w-6 shrink-0 rounded-md"
                     />
                     <div className="min-w-0 rounded-2xl rounded-tl-sm bg-white/5 px-3.5 py-2.5">
-                      {isLiveStream && !msg.content ? (
-                        // Empty placeholder — show Cline thinking indicator
-                        <div className="flex items-center gap-2">
-                          <Wand2 className="h-3 w-3 shrink-0 text-blue-400/60 animate-pulse" />
-                          <span className="text-[12px] text-white/30 animate-pulse">
-                            Cline is thinking…
-                          </span>
-                        </div>
-                      ) : isLiveStream && msg.content ? (
-                        // Streaming thinking text — show raw (not markdown)
-                        // with a blinking cursor at the end
-                        <div>
-                          <div className="mb-1.5 flex items-center gap-1.5">
-                            <Wand2 className="h-3 w-3 shrink-0 text-blue-400/60" />
-                            <span className="text-[10px] font-medium uppercase tracking-wider text-blue-400/50">
-                              Agent reasoning
-                            </span>
-                          </div>
-                          <p className="text-[12px] leading-relaxed text-white/35 wrap-break-word">
-                            {msg.content}
-                            <span className="ml-0.5 inline-block h-3 w-0.5 animate-[blink_1s_ease-in-out_infinite] bg-blue-400/60 align-middle" />
-                          </p>
-                        </div>
-                      ) : (
-                        // Normal completed assistant message
+                      (
                         <div className="prose prose-sm prose-invert max-w-none wrap-break-word text-[13px] leading-relaxed text-white/70 [&_code]:rounded [&_code]:bg-white/10 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-blue-300/80 [&_code]:text-xs [&_code]:break-all [&_li]:my-0.5 [&_p]:my-1 [&_pre]:overflow-x-auto! [&_pre]:whitespace-pre-wrap! [&_ul]:my-1">
                           <ReactMarkdown>{msg.content}</ReactMarkdown>
                         </div>
-                      )}
+                      )
                     </div>
                   </div>
                 )}
@@ -339,7 +308,7 @@ export function ChatPanel({
         <div
           className={cn(
             "rounded-xl border bg-white/4 transition-colors",
-            isGenerating || isImproving
+            isGenerating
               ? "border-white/4"
               : noCredits
               ? "border-white/4 opacity-60"
@@ -351,12 +320,10 @@ export function ChatPanel({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            disabled={isGenerating || isImproving || noCredits}
+            disabled={isGenerating || noCredits}
             placeholder={
               noCredits
                 ? "Upgrade to keep building…"
-                : isImproving
-                ? "Cline is improving your app…"
                 : isGenerating
                 ? "Generating…"
                 : "Ask AI to modify…"
@@ -371,7 +338,7 @@ export function ChatPanel({
               variant="ghost"
               size="icon"
               onClick={() => fileRef.current?.click()}
-              disabled={isGenerating || isImproving || isUploading || noCredits}
+              disabled={isGenerating || isUploading || noCredits}
               className="h-7 w-7 rounded-lg text-white/25 hover:bg-white/6 hover:text-white/50 disabled:opacity-40"
             >
               {isUploading ? (
@@ -390,7 +357,7 @@ export function ChatPanel({
             />
 
             {/* Stop button — shown while generating or improving */}
-            {isGenerating || isImproving ? (
+            {isGenerating ? (
               <Button
                 size="icon"
                 onClick={onStop}
@@ -417,7 +384,7 @@ export function ChatPanel({
         </div>
 
         <p className="mt-1.5 text-center text-[10px] text-white/15">
-          {isGenerating || isImproving
+          {isGenerating
             ? "Click ■ to stop generation"
             : "⏎ to send · Shift+⏎ for new line"}
         </p>

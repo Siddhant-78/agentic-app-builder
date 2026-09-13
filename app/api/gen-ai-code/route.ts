@@ -4,7 +4,6 @@ import { GoogleGenAI } from "@google/genai";
 import { db } from "@/lib/prisma";
 import { CREDIT_COST_PER_GENERATION } from "@/lib/constants";
 import type { Message, FileData } from "@/types/workspace";
-import { aj } from "@/lib/arcjet";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
@@ -126,9 +125,8 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { workspaceId, userId, messages, fileData } = body as {
+  const { workspaceId, messages, fileData } = body as {
     workspaceId: string | null;
-    userId: string;
     messages: Message[];
     fileData: FileData | null;
   };
@@ -137,32 +135,8 @@ export async function POST(request: NextRequest) {
     return Response.json({ message: "No messages provided" }, { status: 400 });
   }
 
-  // ── Arcjet: rate limit, prompt injection, sensitive info ──────────────────
-  // detectPromptInjectionMessage requires the actual user text to inspect.
-
-  const arcjetReq = new Request(request.url, {
-    method: request.method,
-    headers: request.headers,
-    body: JSON.stringify(body),
-  });
-
-  const lastUserMessage =
-    [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
-  const decision = await aj.protect(arcjetReq, {
-    requested: 1,
-    userId: clerkId,
-    detectPromptInjectionMessage: lastUserMessage,
-  });
-
-  if (decision.isDenied()) {
-    return Response.json(
-      { message: decision.reason?.type ?? "Request blocked" },
-      { status: 429 }
-    );
-  }
-
   const user = await db.user.findUnique({
-    where: { id: userId, clerkId },
+    where: { clerkId },
     select: { id: true, credits: true },
   });
 
@@ -279,32 +253,43 @@ export async function POST(request: NextRequest) {
           { role: "assistant", content: assistantMessage },
         ];
 
-        const [workspace] = await db.$transaction([
-          workspaceId
-            ? db.workspace.update({
-                where: { id: workspaceId, userId },
+        const { workspace, creditsRemaining } = await db.$transaction(async (tx) => {
+          const debit = await tx.user.updateMany({
+            where: {
+              id: user.id,
+              clerkId,
+              credits: { gte: CREDIT_COST_PER_GENERATION },
+            },
+            data: { credits: { decrement: CREDIT_COST_PER_GENERATION } },
+          });
+
+          if (debit.count !== 1) {
+            throw new Error("Insufficient credits");
+          }
+
+          const workspace = workspaceId
+            ? await tx.workspace.update({
+                where: { id: workspaceId, userId: user.id },
                 data: {
                   messages: updatedMessages as never,
                   fileData: newFileData as never,
                 },
               })
-            : db.workspace.create({
+            : await tx.workspace.create({
                 data: {
-                  userId,
+                  userId: user.id,
                   title: aiTitle ?? lastUserMessage.content.slice(0, 80),
                   messages: updatedMessages as never,
                   fileData: newFileData as never,
                 },
-              }),
-          db.user.update({
-            where: { id: userId },
-            data: { credits: { decrement: CREDIT_COST_PER_GENERATION } },
-          }),
-        ]);
+              });
 
-        const updatedUser = await db.user.findUnique({
-          where: { id: userId },
-          select: { credits: true },
+          const updatedUser = await tx.user.findUniqueOrThrow({
+            where: { id: user.id },
+            select: { credits: true },
+          });
+
+          return { workspace, creditsRemaining: updatedUser.credits };
         });
 
         // ── Emit final result ──────────────────────────────────────────────────
@@ -314,8 +299,7 @@ export async function POST(request: NextRequest) {
             workspaceId: workspace.id,
             assistantMessage,
             fileData: newFileData,
-            creditsRemaining:
-              updatedUser?.credits ?? user.credits - CREDIT_COST_PER_GENERATION,
+            creditsRemaining,
           })
         );
       } catch (err) {
