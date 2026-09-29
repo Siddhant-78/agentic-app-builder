@@ -182,7 +182,7 @@ function SandpackInner({
       const zip = new JSZip();
 
       const packageJson = {
-        name: "forge-app",
+        name: "nexa-app",
         version: "1.0.0",
         private: true,
         dependencies: {
@@ -209,7 +209,7 @@ function SandpackInner({
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Forge App</title>
+    <title>Nexa App</title>
     <script src="https://cdn.tailwindcss.com"></script>
   </head>
   <body>
@@ -241,7 +241,7 @@ root.render(<React.StrictMode><App /></React.StrictMode>);`
 
       zip.file(
         "README.md",
-        `# Forge App\n\nGenerated with [Forge](https://forge.app).\n\n## Getting started\n\n\`\`\`bash\nnpm install\nnpm start\n\`\`\``
+        `# Nexa App\n\nGenerated with [Nexa](https://nexa.app).\n\n## Getting started\n\n\`\`\`bash\nnpm install\nnpm start\n\`\`\``
       );
 
       const blob = await zip.generateAsync({ type: "blob" });
@@ -253,7 +253,7 @@ root.render(<React.StrictMode><App /></React.StrictMode>);`
             .toLowerCase()
             .replace(/[^a-z0-9]+/g, "-")
             .replace(/^-|-$/g, "")}.zip`
-        : "forge-app.zip";
+        : "nexa-app.zip";
       a.download = zipName;
       a.click();
       URL.revokeObjectURL(url);

@@ -1,5 +1,5 @@
 export const GrayTitle = ({ children }: { children: React.ReactNode }) => (
-  <span className="text-white/90">{children}</span>
+  <span className="text-foreground">{children}</span>
 );
 
 export const BlueTitle = ({
@@ -10,7 +10,7 @@ export const BlueTitle = ({
   className?: string;
 }) => (
   <span
-    className={`bg-linear-to-br font-serif from-blue-300 via-blue-400 to-blue-600 bg-clip-text text-transparent ${className}`}
+    className={`bg-linear-to-br font-serif from-cyan-500 via-blue-500 to-indigo-500 bg-clip-text text-transparent ${className}`}
   >
     {children}
   </span>

@@ -12,16 +12,16 @@ import { Button } from "@/components/ui/button";
 function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center py-32 text-center">
-      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-white/8 bg-white/4">
-        <Zap className="h-5 w-5 text-white/20" />
+      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-border bg-muted">
+        <Zap className="h-5 w-5 text-muted-foreground" />
       </div>
-      <p className="mb-1 text-sm font-medium text-white/40">No projects yet</p>
-      <p className="mb-6 text-xs text-white/20">
+      <p className="mb-1 text-sm font-medium text-muted-foreground">No projects yet</p>
+      <p className="mb-6 text-xs text-muted-foreground">
         Head to the homepage and describe what you want to build.
       </p>
       <Link
         href="/"
-        className="inline-flex h-8 items-center gap-1.5 rounded-full bg-white px-4 text-[13px] font-semibold text-black transition-opacity hover:opacity-90"
+        className="inline-flex h-8 items-center gap-1.5 rounded-full bg-primary px-4 text-[13px] font-semibold text-primary-foreground transition-opacity hover:opacity-90"
       >
         Start building
       </Link>
@@ -38,13 +38,13 @@ export default async function ProjectsPage() {
   const projects = await getUserProjects();
 
   return (
-    <main className="min-h-screen bg-[#0a0a0a] px-4 py-10">
+    <main className="min-h-screen bg-background px-4 py-10">
       <div className="mx-auto max-w-5xl">
         {/* Header */}
         <div className="mb-8 flex items-center justify-between">
           <div>
             <BlueTitle className="text-6xl">Projects</BlueTitle>
-            <p className="mt-3 text-sm text-white/30">
+            <p className="mt-3 text-sm text-muted-foreground">
               All your AI-generated apps in one place.
             </p>
           </div>
