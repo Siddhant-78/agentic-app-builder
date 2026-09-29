@@ -4,7 +4,7 @@
 
 Nexa is an AI-powered app builder for moving from a rough idea to an editable, exportable application. Describe what you want to build, iterate with an AI workspace, inspect the generated preview and code, then download the project when it is ready.
 
-![Nexa dark SaaS interface](public/nexa-mark.svg)
+![Nexa dark SaaS interface](public/background.png)
 
 ## Why Nexa?
 
